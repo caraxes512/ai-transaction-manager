@@ -1,93 +1,172 @@
-# AI Transaction Manager
+# 🪙 AI Transaction Manager
 
-FastAPI + PostgreSQL backend (Phase 1). Web dashboard and mobile app come later.
+A full-stack personal finance app with AI-powered categorization, spending insights, anomaly detection, and budget tracking.
 
-## Run it
+**Stack:** FastAPI · PostgreSQL · React · TypeScript · Vite · Expo (React Native)
+
+---
+
+## Screenshots
+
+### Dashboard
+![Dashboard](docs/screenshots/01.png)
+
+### Transactions
+![Transactions](docs/screenshots/02.png)
+
+### Budgets
+![Budgets](docs/screenshots/03.png)
+
+---
+
+## Features
+
+- **AI Categorization** — Transactions are auto-categorized using your past labels → keyword rules → optional LLM (Claude). Confidence score shown on every transaction.
+- **Spending Insights** — Monthly summary with findings and actionable suggestions, generated from SQL facts with an optional LLM rewrite.
+- **Anomaly Detection** — Flags expenses far above your typical spend for a category and duplicate charges within a day.
+- **Budget Tracking** — Per-category monthly limits with real-time status (`on track` / `close to limit` / `exceeded`), projected month-end spend, and alerts.
+- **Web Dashboard** — React + Vite app with charts, AI insights, transaction history, and budget management.
+- **Mobile App** — Expo (React Native) app with quick-add, receipt scanning, budgets, and insights.
+
+---
+
+## Quick Start
+
+### 1. Backend
 
 ```bash
-docker compose up -d                 # PostgreSQL on :5432
+# Start PostgreSQL
+brew services start postgresql@17   # or: docker compose up -d
+
 cd backend
+cp .env.example .env                # fill in SECRET_KEY and optionally ANTHROPIC_API_KEY
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload       # http://localhost:8000
 ```
 
-Open http://localhost:8000/docs, call `POST /auth/register`, then click **Authorize**
-(username = your email) and try the transaction endpoints.
+Visit [http://localhost:8000/docs](http://localhost:8000/docs) → `POST /auth/register` → **Authorize** → explore endpoints.
 
-## AI categorization
-
-`POST /transactions` without a `category_id` auto-categorizes when confidence >= 0.75.
-`POST /ai/categorize` returns a suggestion without saving (for previews / receipt scanning).
-
-Resolution order: your own past labels -> keyword rules -> LLM fallback.
-The LLM step only runs if `ANTHROPIC_API_KEY` is set in `.env`; everything else works without it.
-
-> The schema changed in step 6 (`category_source`, `category_confidence`). While there are no
-> migrations yet, reset your dev DB: `docker compose down -v && docker compose up -d`.
-
-## Insights and anomalies
-
-`GET /ai/insights?month=2026-10` - numbers and findings come from SQL; with an API key an LLM rewrites them
-as a short summary. Any number in the LLM's text that was not in its input causes the response to be
-discarded in favour of a template (`"source": "template"`). `facts` shows the exact data used.
-
-`GET /ai/anomalies?days=30` - expenses far above the user's typical amount for that category (judged only
-against earlier spending), and same-description/same-amount charges within a day. No AI involved.
-
-## Budgets
-
-`POST /budgets` sets a monthly limit for a category. `GET /budgets?month=2026-10` returns each budget with
-`spent`, `remaining`, `percent_used` and a `status` (`ok` < 80% <= `warning` < 100% <= `exceeded`).
-`GET /budgets/alerts` returns only the warning/exceeded ones (for future push notifications). For the current
-month, after day 7, `projected_spend` / `projected_to_exceed` estimate the month-end total from *your own* previous three
-months (what share of this category is normally spent by today); with too little history, or when little is normally spent by now, the
-projection is `null` rather than a guess. Rent paid early or a subscription charged late never triggers a false alarm. Budget problems also appear in `/ai/insights`.
-
-## Phase 2: web dashboard
-
-React + TypeScript + Vite app in [`web/`](web/README.md): login, dashboard with charts and AI insights,
-transactions with a live AI category preview, and budgets.
+### 2. Web Dashboard
 
 ```bash
-cd web && cp .env.example .env && npm install && npm run dev   # http://localhost:5173
+cd web
+cp .env.example .env
+npm install
+npm run dev                         # http://localhost:5173
 ```
 
-## Phase 3: mobile app
-
-Expo (React Native) app in [`mobile/`](mobile/README.md): quick add with a live AI category preview, **receipt scanning**
-(photo -> reviewable draft -> confirm), transactions, budgets and insights.
+### 3. Mobile App
 
 ```bash
-cd mobile && cp .env.example .env && npm install && npx expo start
+cd mobile
+cp .env.example .env
+npm install
+npx expo start
 ```
 
-To get an **Android APK** see [`mobile/BUILD_APK.md`](mobile/BUILD_APK.md).
+For an Android APK see [`mobile/BUILD_APK.md`](mobile/BUILD_APK.md).
 
-Receipt scanning uses `POST /ai/receipt` (image upload, needs `ANTHROPIC_API_KEY`). It returns a *draft* and saves nothing.
+---
+
+## Environment Variables
+
+Copy `backend/.env.example` to `backend/.env` and fill in:
+
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `SECRET_KEY` | Run `openssl rand -hex 32` to generate |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | JWT lifetime (default: 60) |
+| `ANTHROPIC_API_KEY` | Optional — enables LLM insights & receipt scanning |
+| `ANTHROPIC_MODEL` | Claude model to use (default: `claude-haiku-4-5-20251001`) |
+| `AUTO_CATEGORIZE_THRESHOLD` | Min confidence to auto-apply AI category (default: 0.75) |
+| `CORS_ORIGINS` | JSON list of allowed browser origins |
+
+> Without `ANTHROPIC_API_KEY` the app still works fully — categorization uses history + keyword rules, and insights use template-based summaries.
+
+---
+
+## How AI Categorization Works
+
+`POST /transactions` without a `category_id` triggers auto-categorization when confidence ≥ `AUTO_CATEGORIZE_THRESHOLD`.  
+`POST /ai/categorize` returns a suggestion without saving (used for live previews and receipt scanning).
+
+**Resolution order:**
+1. Your own past labels for similar descriptions
+2. Keyword rules (e.g. "zomato" → Food, "salary" → Salary)
+3. LLM fallback via Claude *(only if `ANTHROPIC_API_KEY` is set)*
+
+---
+
+## API Highlights
+
+| Endpoint | Description |
+|---|---|
+| `POST /auth/register` | Create account |
+| `POST /auth/login` | Get JWT token |
+| `GET/POST /transactions` | List / create transactions |
+| `GET /categories` | List categories |
+| `POST /ai/categorize` | Preview AI category suggestion |
+| `POST /ai/receipt` | Scan a receipt image (needs API key) |
+| `GET /ai/insights?month=YYYY-MM` | Monthly AI spending summary |
+| `GET /ai/anomalies?days=30` | Unusual activity and duplicate charges |
+| `GET /analytics/monthly?months=6` | Income vs spend bar chart data |
+| `GET /analytics/categories?month=YYYY-MM` | Category breakdown |
+| `GET/POST /budgets` | Manage monthly category budgets |
+| `GET /budgets/alerts` | Budgets at warning or exceeded status |
+
+---
 
 ## Tests
 
-Full guide, including Swagger and Postman walkthroughs: [docs/TESTING.md](docs/TESTING.md).
+Full testing guide (Swagger walkthrough, Postman collection, pytest): [docs/TESTING.md](docs/TESTING.md)
 
 ```bash
 cd backend && python -m pytest
 ```
 
-Tests use in-memory SQLite by default. Set `TEST_DATABASE_URL` to run them on PostgreSQL.
+Tests use in-memory SQLite by default. Set `TEST_DATABASE_URL` to run against PostgreSQL.
 
-## Progress
+---
 
-- [x] 1. Project setup
-- [x] 2. Database (SQLAlchemy 2.0)
-- [x] 3. Auth (register / login / JWT)
-- [x] 4. Transactions CRUD + filters
-- [x] 5. Categories
-- [x] 6. AI categorization (history -> keyword rules -> optional LLM)
-- [x] 7. Analytics (monthly + category breakdown with month-over-month)
-- [x] 8. AI insights (SQL facts -> findings -> optional LLM wording, with a numeric guardrail)
-- [x] 9. Anomaly detection (median/MAD outliers + duplicate charges)
-- [x] 10. API testing (Swagger guide, Postman collection, pytest on SQLite and PostgreSQL)
-- [x] Budgets (per-category monthly limits, status, alerts, projections)
+## Project Structure
 
-**Phase 1 (backend + AI) is complete.** Next: Phase 2, the web dashboard.
+```
+ai-transaction-manager/
+├── backend/               # FastAPI + SQLAlchemy + PostgreSQL
+│   ├── app/
+│   │   ├── models/        # SQLAlchemy ORM models
+│   │   ├── routes/        # API route handlers
+│   │   ├── schemas/       # Pydantic request/response schemas
+│   │   └── services/      # AI, analytics, budget logic
+│   └── tests/             # pytest test suite
+├── web/                   # React + TypeScript + Vite dashboard
+│   └── src/
+│       ├── pages/         # Dashboard, Transactions, Budgets, Login
+│       ├── components/    # Layout, TransactionForm, UI primitives
+│       └── api/           # API client and typed hooks
+├── mobile/                # Expo (React Native) app
+│   └── src/
+│       ├── app/           # File-based routing (Expo Router)
+│       ├── components/    # Shared UI components
+│       └── lib/           # Hooks, formatting, storage
+└── docs/                  # Testing guide, Postman collection, screenshots
+```
+
+---
+
+## Roadmap
+
+- [x] Project setup
+- [x] Database (SQLAlchemy 2.0)
+- [x] Auth (register / login / JWT)
+- [x] Transactions CRUD + filters
+- [x] Categories
+- [x] AI categorization (history → keyword rules → optional LLM)
+- [x] Analytics (monthly + category breakdown with month-over-month)
+- [x] AI insights (SQL facts → findings → optional LLM wording)
+- [x] Anomaly detection (outliers + duplicate charges)
+- [x] Budgets (monthly limits, status, alerts, projections)
+- [x] Web dashboard (React + Vite)
+- [x] Mobile app (Expo + receipt scanning)
