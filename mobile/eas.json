@@ -1,0 +1,16 @@
+{
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://CHANGE-ME-TO-YOUR-LAN-IP:8000",
+        "ALLOW_CLEARTEXT": "1"
+      }
+    },
+    "production": {
+      "android": { "buildType": "app-bundle" },
+      "env": { "EXPO_PUBLIC_API_URL": "https://CHANGE-ME-your-api.example.com" }
+    }
+  }
+}

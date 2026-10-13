@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "AI Transaction Manager",
+    "slug": "ai-transaction-manager",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "aitxn",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.example.aitransactionmanager"
+    },
+    "android": {
+      "package": "com.example.aitransactionmanager",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#4f46e5"
+      },
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-status-bar",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow AI Transaction Manager to use the camera to scan receipts.",
+          "photosPermission": "Allow AI Transaction Manager to read a receipt photo from your library.",
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "icon": "./assets/icon.png",
+    "description": "Track spending with AI categorization, receipt scanning, budgets and insights."
+  }
+}
